@@ -1,7 +1,6 @@
 use bevy::{
     color::palettes::css::{GREEN, RED},
-    core_pipeline::prepass::DepthPrepass,
-    math::VectorSpace,
+    diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
     pbr::{ExtendedMaterial, MaterialExtension},
     prelude::*,
     render::render_resource::{AsBindGroup, ShaderRef},
@@ -18,6 +17,8 @@ fn main() {
         DefaultPlugins,
         FlyCameraPlugin,
         MaterialPlugin::<ExtendedMaterial<StandardMaterial, ExplosionMaterialExtension>>::default(),
+        FrameTimeDiagnosticsPlugin::default(),
+        LogDiagnosticsPlugin::default(),
         EguiPlugin {
             enable_multipass_for_primary_context: true,
         },
@@ -155,7 +156,7 @@ fn on_params_changed(
     };
 
     material.extension.progress = Vec4::new(params.progress, 0.0, 0.0, 0.0);
-    material.extension.radius =  Vec4::new(params.radius, 0.0, 0.0, 0.0);
+    material.extension.radius = Vec4::new(params.radius, 0.0, 0.0, 0.0);
 }
 
 fn build_sliders(mut contexts: EguiContexts, mut params: ResMut<Params>, mut commands: Commands) {
