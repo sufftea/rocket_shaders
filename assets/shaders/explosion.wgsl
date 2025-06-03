@@ -24,22 +24,24 @@ var<uniform> center: vec4f;
 var<uniform> radius: vec4f;
 
 
-const STEP_LENGTH: f32 = 3.0;
-const LIGHT_STEP_LENGTH: f32 = 4.0;
+const STEP_LENGTH: f32 = 4.0;
+const LIGHT_STEP_LENGTH: f32 = 2.0;
+
+
 
 fn density_at_point(point: vec3f) -> f32 {
     let progress = progress.x;
     let center = center.xyz;
     let radius = radius.x;
 
-    let dist = distance(point, center) / (radius * 2.);
+    let dist = distance(point, center) / radius;
 
-    let noise_scale = 6. * (1. + progress * 2);
+    let noise_scale = 4. * (1. + progress);
     let noise = snoise(point / noise_scale) * 0.5 + 0.5;
-    let progress_radius_mask = smoothstep(progress, progress - 0.2, dist);
+    let progress_radius_mask = smoothstep(progress, progress - 0.1, dist);
     var density = noise * progress_radius_mask;
 
-    let sparseness = smoothstep(0.1, 0.99, progress);
+    let sparseness = smoothstep(0.3, 0.99, progress);
     density =  smoothstep(sparseness, sparseness + 0.1, density);
 
     return density;
@@ -53,7 +55,7 @@ fn fragment(
     let progress = progress.x;
     let center = center.xyz;
     let radius = radius.x;
-
+  
     let pbr_input = pbr_input_from_standard_material(in, is_front);
     let light_direction = mesh_view_bindings::lights.directional_lights[0].direction_to_light;
     
@@ -65,7 +67,6 @@ fn fragment(
     var max_density: f32 = 0.0;
     var cum_brightness: f32 = 0.0;
 
-    
     for (var i = 0u; i < steps; i++) {
         position -= pbr_input.V * STEP_LENGTH;
         let d = density_at_point(position);
@@ -75,34 +76,27 @@ fn fragment(
         var light_pos = position;
         for (var j = 0u; j < light_steps; j++) {
             let ld = density_at_point(light_pos);
-            transmittance *= 1.0 / (2.0 * ld * LIGHT_STEP_LENGTH + 1.0);
+            transmittance *= exp(-ld * LIGHT_STEP_LENGTH);
             light_pos += light_direction * LIGHT_STEP_LENGTH;
-
-            if (transmittance < 0.1) {
-                break;
-            }
         }
 
         // accumulate scattering: more density, more brightness, but modulated by how much light makes it in
         cum_brightness += d * transmittance * STEP_LENGTH;
-        max_density += max(d, max_density);
-
-        if (max_density > 0.8) {
-            break;
-        }
+        // cum_density += d;
+        max_density = max(max_density, d);
     }
     
     var out: FragmentOutput;
 
 
     var color = vec3f(cum_brightness);
-    if (cum_brightness > 0.3) {
+    if (cum_brightness > 0.1) {
         color = vec3f(
             0. / 255., 
             70. / 255.,
             247. / 255.
         );
-    } else if (cum_brightness > 0.20) {
+    } else if (cum_brightness > 0.05) {
         color = vec3f(
             138. / 255., 
             165. / 255.,
@@ -116,34 +110,19 @@ fn fragment(
         );
     }
 
-
     let alpha = 1.0 - exp(-max_density);
     var alpha_mod = alpha;
-
-
-    // if (alpha > 0.4) {
-    //     alpha_mod = 0.8;
-    // } else if (alpha > 0.1) {
-    //     alpha_mod = 0.5;
-    // } else if (alpha > 0.05) {
-    //     color = vec3f(
-    //         1.0, 
-    //         1.0,
-    //         1.0,
-    //     );
-    //     alpha_mod = 1.0;
-    // } else {
-    //     alpha_mod = 0.0;
-    // }
-
-    // if (alpha < OUTLINE_START && alpha > OUTLINE_START - OUTLINE_WIDTH) {
-    //     color = vec3f(
-    //         126. / 255., 
-    //         96. / 255.,
-    //         255. / 255.
-    //     );
-    // }
-
+    if (alpha_mod > 0.7) {
+        alpha_mod = 0.9;
+    } else if (alpha_mod > 0.5) {
+        alpha_mod = 0.5;
+    } else if (alpha_mod > 0.3) {
+        alpha_mod = alpha_mod * 0.1;
+        // alpha_mod = 0.0;
+        // alpha_mod = 1.0;
+    } else {
+        alpha_mod = 0.0;
+    }
 
     out.color = vec4f(color, alpha_mod);
 
