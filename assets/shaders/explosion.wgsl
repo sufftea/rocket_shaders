@@ -25,7 +25,7 @@ var<uniform> radius: vec4f;
 
 
 const STEP_LENGTH: f32 = 4.0;
-const LIGHT_STEP_LENGTH: f32 = 2.0;
+const LIGHT_STEP_LENGTH: f32 = 8.0;
 
 
 
@@ -36,7 +36,7 @@ fn density_at_point(point: vec3f) -> f32 {
 
     let dist = distance(point, center) / radius;
 
-    let noise_scale = 4. * (1. + progress);
+    let noise_scale = 2. + progress * 8.;
     let noise = snoise(point / noise_scale) * 0.5 + 0.5;
     let progress_radius_mask = smoothstep(progress, progress - 0.1, dist);
     var density = noise * progress_radius_mask;
@@ -74,29 +74,34 @@ fn fragment(
         // march toward the light for current sample point
         var transmittance = 1.0;
         var light_pos = position;
-        for (var j = 0u; j < light_steps; j++) {
+        var j = 0u;
+        for (; j < light_steps; j++) {
             let ld = density_at_point(light_pos);
-            transmittance *= exp(-ld * LIGHT_STEP_LENGTH);
+            // transmittance *= exp(-ld * LIGHT_STEP_LENGTH);
+            transmittance *= 1. / (2.0 * ld + 1.0);
             light_pos += light_direction * LIGHT_STEP_LENGTH;
         }
 
         // accumulate scattering: more density, more brightness, but modulated by how much light makes it in
-        cum_brightness += d * transmittance * STEP_LENGTH;
+        cum_brightness += d * transmittance;
         // cum_density += d;
         max_density = max(max_density, d);
+        if (max_density > 0.7) {
+            break;
+        } 
     }
     
     var out: FragmentOutput;
 
 
     var color = vec3f(cum_brightness);
-    if (cum_brightness > 0.1) {
+    if (cum_brightness > 0.33) {
         color = vec3f(
             0. / 255., 
             70. / 255.,
             247. / 255.
         );
-    } else if (cum_brightness > 0.05) {
+    } else if (cum_brightness > 0.25) {
         color = vec3f(
             138. / 255., 
             165. / 255.,
@@ -116,10 +121,6 @@ fn fragment(
         alpha_mod = 0.9;
     } else if (alpha_mod > 0.5) {
         alpha_mod = 0.5;
-    } else if (alpha_mod > 0.3) {
-        alpha_mod = alpha_mod * 0.1;
-        // alpha_mod = 0.0;
-        // alpha_mod = 1.0;
     } else {
         alpha_mod = 0.0;
     }
