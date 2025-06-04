@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, f32::consts::PI, time::Duration};
+use std::{cmp::Ordering, collections::VecDeque, f32::consts::PI, time::Duration};
 
 use avian2d::{PhysicsPlugins, math::Vector, prelude::*};
 use bevy::{
@@ -6,7 +6,7 @@ use bevy::{
     math::VectorSpace,
     pbr::{ExtendedMaterial, MaterialExtension},
     prelude::*,
-    reflect::hash_error,
+    reflect::{List, hash_error},
     render::render_resource::{AsBindGroup, Face, ShaderRef},
     scene::SceneInstance,
     time::common_conditions::on_timer,
@@ -16,27 +16,22 @@ use bevy_fly_camera::FlyCamera;
 use bevy_tweening::{Animator, Delay, Tween, TweenCompleted};
 
 const FIRE_SHADER_PATH: &str = "shaders/rocket_fire.wgsl";
-const NOF_PARTICLES: usize = 10;
+const NOF_PARTICLES: usize = 20;
 const PARTICLE_SPEED: f32 = 40.;
 
 pub struct RocketFirePlugin;
 
 impl Plugin for RocketFirePlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((
-            MaterialPlugin::<ExtendedMaterial<StandardMaterial, FireMaterialExtension>>::default(),
-            PhysicsPlugins::default(),
-        ))
-        .add_systems(EguiContextPass, build_sliders)
-        .add_systems(Startup, setup_scene)
-        .add_systems(Update, on_params_changed.run_if(resource_changed::<Params>))
-        .add_systems(Update, customize_scene_materials)
-        .add_systems(Update, set_shader_params)
-        .add_systems(
-            Update,
-            spawn_particle.run_if(on_timer(Duration::from_millis(40))),
-        )
-        .init_resource::<Params>();
+        app.add_plugins((MaterialPlugin::<
+            ExtendedMaterial<StandardMaterial, FireMaterialExtension>,
+        >::default(),))
+            .add_systems(EguiContextPass, build_sliders)
+            .add_systems(Startup, setup_scene)
+            .add_systems(Update, on_params_changed.run_if(resource_changed::<Params>))
+            .add_systems(Update, customize_scene_materials)
+            .add_systems(Update, set_shader_params)
+            .init_resource::<Params>();
     }
 }
 
@@ -215,51 +210,7 @@ fn customize_scene_materials(
     }
 }
 
-fn spawn_particle(
-    mut commands: Commands,
-    rocket_transform: Single<&Transform, With<Rocket>>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut last_id: Local<usize>,
-    params: Res<Params>,
-    particles: Query<(Entity, &Particle)>,
-) {
-    let particles = particles.iter().collect::<Vec<(Entity, &Particle)>>();
-    if particles.len() > NOF_PARTICLES {
-        let mut oldest_partile_entity: Option<Entity> = None;
-        let mut oldest_id = usize::MAX;
-        for (entity, particle) in particles {
-            if particle.id < oldest_id {
-                oldest_partile_entity = Some(entity);
-                oldest_id = particle.id;
-            }
-        }
-
-        if let Some(oldest_partile_entity) = oldest_partile_entity {
-            commands.entity(oldest_partile_entity).despawn();
-        }
-    }
-
-    commands.spawn((
-        RigidBody::Kinematic,
-        LinearVelocity(-PARTICLE_SPEED * rocket_transform.rotation.mul_vec3(Vec3::Y).xy()),
-        Transform::from_translation(
-            rocket_transform.translation
-                - rocket_transform.rotation.mul_vec3(Vec3::Y) * params.power * 100. * 0.02,
-        ),
-        // Mesh3d(meshes.add(Sphere::new(0.2))),
-        // MeshMaterial3d(materials.add(StandardMaterial {
-        //     base_color: RED.into(),
-        //     ..Default::default()
-        // })),
-        Particle { id: *last_id },
-    ));
-
-    *last_id += 1;
-}
-
 fn set_shader_params(
-    particles: Query<(&Transform, &Particle)>,
     rocket_transform: Single<&Transform, With<Rocket>>,
     mut fire_materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, FireMaterialExtension>>>,
     fire_material: Single<
@@ -267,23 +218,43 @@ fn set_shader_params(
         With<Fire>,
     >,
     params: Res<Params>,
+
+    mut particles_queue: Local<VecDeque<(Vec2, Vec2)>>,
+    mut last_particle_spawned: Local<u128>,
+    time: Res<Time>,
 ) {
     let Some(fire_material) = fire_materials.get_mut(fire_material.id()) else {
         return;
     };
 
-    for (i, (transform, _)) in particles.iter().enumerate() {
-        fire_material.extension.particles[i] = transform.translation.extend(0.0);
+    let flame_dir = rocket_transform.rotation.mul_vec3(-Vec3::Y);
+    let curr_time = time.elapsed().as_millis();
+    if curr_time - *last_particle_spawned > 50 {
+        particles_queue.push_front((rocket_transform.translation.xy(), flame_dir.xy()));
+
+        if particles_queue.len() >= NOF_PARTICLES {
+            particles_queue.pop_back();
+        }
+
+        *last_particle_spawned = curr_time;
     }
 
-    fire_material.extension.nof_particles = UVec4::new(NOF_PARTICLES as u32, 0, 0, 0);
+    for (pos, flame_dir) in &mut particles_queue {
+        *pos += *flame_dir * 0.4 * params.power;
+    }
 
-    fire_material.extension.dir = rocket_transform.rotation.mul_vec3(Vec3::Y).extend(0.0);
+    for (i, (pos, _)) in particles_queue.iter().enumerate() {
+        fire_material.extension.particles[i] = pos.extend(0.0).extend(0.0);
+    }
+
+    fire_material.extension.nof_particles = UVec4::new(particles_queue.len() as u32, 0, 0, 0);
+
+    fire_material.extension.dir = -flame_dir.extend(0.0);
 
     fire_material.extension.center = rocket_transform.translation.extend(0.0);
 
-    // let color = RED.lerp(PURPLE, params.power);
-    fire_material.extension.color = PURPLE.to_vec4();
+    let color = RED.lerp(PURPLE, params.power);
+    fire_material.extension.color = color.to_vec4();
 
     fire_material.extension.power = Vec4::splat(params.power);
 }
