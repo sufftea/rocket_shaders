@@ -58,6 +58,7 @@ fn density_at_point(point: vec3f) -> f32 {
     let dist_to_engine = distance(point, center);
 
     var density = 0.0;
+    var prev_dist = 1.0;
     for (var i = 0u; i < nof_particles; i++) {
         var particle_pos = particles[i].xyz;
         particle_pos += snoise3(particle_pos) * dist_to_engine * 0.1;
@@ -68,12 +69,19 @@ fn density_at_point(point: vec3f) -> f32 {
         var dist = distance(point, particle_pos);
 
         dist = smoothstep(0.0, particle_radius, dist);
-        let curr_density = 1.0 - dist;
+        let t = dist;
+        dist = smooth_min(dist, prev_dist * 1.5, 0.5);
+        prev_dist = t;
+
+        var curr_density = 1.0 - dist;
+
+        curr_density = smooth_min(curr_density, dist, 0.9);
 
         density += curr_density;
     }
     
     density = smoothstep(0.0, 1.0, density * power);
+
 
     var mask = dot(-dir.xy, normalize(local_point.xy));
     mask = smoothstep(0.4, 0.9, mask);
@@ -104,17 +112,17 @@ fn fragment(
     density += density_at_point(position);
 
     out.color = mix(vec4f(color, 0.0), vec4f(1.0), density);
-    // if (density > 0.7) {
-    //   out.color = mix(vec4f(color, 0.3), vec4f(1.0), 0.2);
-    // } else if (density > 0.35) {
-    //   out.color = mix(vec4f(color, 0.7), vec4f(1.0), 0.99);
-    // } else  if (density > 0.2) {
-    //   out.color = mix(vec4f(color, 0.5), vec4f(1.0), 0.6);
-    // } else if (density > 0.1) {
-    //   out.color = mix(vec4f(color, 0.4), vec4f(1.0), 0.4);
-    // } else {
-    //   out.color = vec4f(0.0);
-    // }
+    if (density > 0.7) {
+      out.color = mix(vec4f(color, 0.7), vec4f(1.0), 0.9);
+    } else if (density > 0.55) {
+      out.color = mix(vec4f(color, 0.7), vec4f(1.0), 0.8);
+    } else  if (density > 0.3) {
+      out.color = mix(vec4f(color, 0.5), vec4f(1.0), 0.6);
+    } else if (density > 0.1) {
+      out.color = mix(vec4f(color, 0.4), vec4f(1.0), 0.4);
+    } else {
+      out.color = vec4f(0.0);
+    }
 
     return out;
     
