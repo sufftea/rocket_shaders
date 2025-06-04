@@ -130,7 +130,7 @@ fn setup_scene(
     commands.spawn((
         Rocket {},
         SceneRoot(rocket_model),
-        Transform::from_translation(Vec3::new(0.0, 0.0, 0.0)).with_scale(Vec3::ONE * 1.0),
+        Transform::from_translation(Vec3::new(-5.0, 0.0, 0.0)).with_scale(Vec3::ONE * 1.0),
         // CustomizeMaterial {
         //     material: materials.add(StandardMaterial {
         //         base_color: GREEN.into(),
@@ -311,4 +311,6 @@ fn set_shader_params(
     fire_material.extension.nof_particles = UVec4::new(particles.iter().len() as u32, 0, 0, 0);
 
     fire_material.extension.dir = rocket_transform.rotation.mul_vec3(Vec3::Y).extend(0.0);
+
+    fire_material.extension.center = rocket_transform.translation.extend(0.0);
 }
