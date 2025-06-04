@@ -26,6 +26,8 @@ var<uniform> nof_particles: vec4u;
 var<uniform> particles: array<vec4f, 32>;
 @group(2) @binding(104)
 var<uniform> dir: vec4f;
+@group(2) @binding(105)
+var<uniform> power: vec4f;
 
 const PARTICLE_RADIUS: f32 = 2.0;
 
@@ -41,6 +43,7 @@ fn density_at_point(point: vec3f) -> f32 {
     let color = color.xyz;
     let center = center.xyz;
     let nof_particles = nof_particles.x;
+    let power = power.x;
 
     let local_point = point - center;
     let dist_to_engine = distance(point, center);
@@ -61,7 +64,7 @@ fn density_at_point(point: vec3f) -> f32 {
         let curr_density = 1.0 - dist;
 
         let particle_dist = distance(particle_pos, center);
-        let particle_intensity = 2.0 / particle_dist;
+        let particle_intensity = 4.0 * power / particle_dist;
 
         density += curr_density * particle_intensity;
     }
@@ -83,7 +86,9 @@ fn fragment(
 ) -> FragmentOutput {
     var color = color.xyz;
     let center = center.xyz;
+    let power = power.x;
   
+
     let pbr_input = pbr_input_from_standard_material(in, is_front);
     // let light_direction = mesh_view_bindings::lights.directional_lights[0].direction_to_light;
     

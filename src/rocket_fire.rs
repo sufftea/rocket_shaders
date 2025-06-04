@@ -59,6 +59,9 @@ struct FireMaterialExtension {
 
     #[uniform(104)]
     dir: Vec4,
+
+    #[uniform(105)]
+    power: Vec4,
 }
 
 impl Default for FireMaterialExtension {
@@ -69,6 +72,7 @@ impl Default for FireMaterialExtension {
             nof_particles: UVec4::new(NOF_PARTICLES as u32, 0, 0, 0),
             particles: [Vec4::ZERO; 32],
             dir: Vec3::Y.extend(0.0),
+            power: Vec4::new(1.0, 0., 0., 0.),
         }
     }
 }
@@ -97,21 +101,14 @@ struct CustomizeMaterial {
 #[derive(Resource)]
 struct Params {
     rocket_rotation: f32,
-    color: Vec3,
-    center: Vec3,
-    size: f32,
-
-    particle_speed: f32,
+    power: f32,
 }
 
 impl Default for Params {
     fn default() -> Self {
         Self {
             rocket_rotation: 0.0,
-            color: Vec3::new(1., 0., 0.),
-            center: Vec3::new(0., 0., 0.),
-            size: 0.1,
-            particle_speed: 50.0,
+            power: 0.1,
         }
     }
 }
@@ -184,30 +181,15 @@ fn setup_scene(
 
 fn on_params_changed(
     params: Res<Params>,
-    mut fire_materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, FireMaterialExtension>>>,
-    fire_material: Query<
-        &MeshMaterial3d<ExtendedMaterial<StandardMaterial, FireMaterialExtension>>,
-        With<Fire>,
-    >,
     mut rocket_transform: Single<&mut Transform, With<Rocket>>,
 ) {
-    let Ok(material) = fire_material.single() else {
-        return;
-    };
-    let Some(material) = fire_materials.get_mut(material.id()) else {
-        return;
-    };
-
-    let color = RED.lerp(PURPLE, params.particle_speed / 100.);
-    material.extension.color = color.to_vec4();
-
     rocket_transform.rotation = Quat::from_rotation_z(PI * params.rocket_rotation);
 }
 
 fn build_sliders(mut contexts: EguiContexts, mut params: ResMut<Params>, mut commands: Commands) {
     egui::Window::new("Hello").show(contexts.ctx_mut(), |ui| {
         ui.add(egui::Slider::new(&mut params.rocket_rotation, 0.0..=2.0).text("rotation"));
-        ui.add(egui::Slider::new(&mut params.particle_speed, 10.0..=100.0).text("power"));
+        ui.add(egui::Slider::new(&mut params.power, 0.0..=1.0).text("power"));
         // ui.add(egui::Slider::new(&mut params.progress, 0.0..=1.0).text("progress"));
         // ui.add(egui::Slider::new(&mut params.radius, 1.0..=50.0).text("radius"));
     });
@@ -216,10 +198,7 @@ fn build_sliders(mut contexts: EguiContexts, mut params: ResMut<Params>, mut com
 fn customize_scene_materials(
     unloaded_instances: Query<(Entity, &SceneInstance, &CustomizeMaterial)>,
     handles: Query<Entity, (With<MeshMaterial3d<StandardMaterial>>, Without<Rocket>)>,
-    // pbr_materials: Res<Assets<StandardMaterial>>,
     scene_manager: Res<SceneSpawner>,
-    // mut custom_materials: ResMut<Assets<StandardMaterial>>,
-    // mut custom_materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, FireMaterialExtension>>>,
     mut cmds: Commands,
 ) {
     for (entity, instance, customize_material) in unloaded_instances.iter() {
@@ -227,21 +206,11 @@ fn customize_scene_materials(
             cmds.entity(entity).remove::<CustomizeMaterial>();
         }
 
-        // Iterate over all entities in scene (once it's loaded)
         let handles = handles.iter_many(scene_manager.iter_instance_entities(**instance));
         for entity in handles {
-            // let Some(material) = pbr_materials.get(material_handle) else {
-            //     continue;
-            // };
-
             cmds.entity(entity)
                 .remove::<MeshMaterial3d<StandardMaterial>>()
                 .insert(MeshMaterial3d(customize_material.material.clone()));
-
-            // let custom = custom_materials.add(material.into());
-            // cmds.entity(entity)
-            //     .insert(custom)
-            //     .remove::<Handle<StandardMaterial>>();
         }
     }
 }
@@ -276,7 +245,7 @@ fn spawn_particle(
         LinearVelocity(-PARTICLE_SPEED * rocket_transform.rotation.mul_vec3(Vec3::Y).xy()),
         Transform::from_translation(
             rocket_transform.translation
-                - rocket_transform.rotation.mul_vec3(Vec3::Y) * params.particle_speed * 0.02,
+                - rocket_transform.rotation.mul_vec3(Vec3::Y) * params.power * 100. * 0.02,
         ),
         // Mesh3d(meshes.add(Sphere::new(0.2))),
         // MeshMaterial3d(materials.add(StandardMaterial {
@@ -297,6 +266,7 @@ fn set_shader_params(
         &MeshMaterial3d<ExtendedMaterial<StandardMaterial, FireMaterialExtension>>,
         With<Fire>,
     >,
+    params: Res<Params>,
 ) {
     let Some(fire_material) = fire_materials.get_mut(fire_material.id()) else {
         return;
@@ -313,4 +283,13 @@ fn set_shader_params(
     fire_material.extension.dir = rocket_transform.rotation.mul_vec3(Vec3::Y).extend(0.0);
 
     fire_material.extension.center = rocket_transform.translation.extend(0.0);
+
+    // fire_material.extension.power = ;
+
+    // fire_material.extension.
+
+    let color = RED.lerp(PURPLE, params.power);
+    fire_material.extension.color = color.to_vec4();
+
+    fire_material.extension.power = Vec4::splat(params.power);
 }
