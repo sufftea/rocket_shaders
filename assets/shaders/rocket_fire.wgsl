@@ -29,13 +29,22 @@ var<uniform> dir: vec4f;
 @group(2) @binding(105)
 var<uniform> power: vec4f;
 
-const PARTICLE_RADIUS: f32 = 2.0;
-
-
+const PARTICLE_RADIUS: f32 = 3.0;
 
 fn snoise3(p: vec3<f32>) -> vec3<f32> {
     return vec3f(snoise(p), snoise(p + vec3f(100.0)), 0.0);
 }
+
+
+fn smooth_min(a: f32, b: f32, k: f32) -> f32 {
+    let h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+    return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+// fn smooth_max(a: f32, b: f32, k: f32) -> f32 {
+//     let h = clamp(0.5 + 0.5 * (a - b) / k, 0.0, 1.0);
+//     return a * h + b * (1.0 - h) + k * h * (1.0 - h);
+// }
 
 fn density_at_point(point: vec3f) -> f32 {
     let t = mesh_view_bindings::globals.time;
@@ -49,26 +58,23 @@ fn density_at_point(point: vec3f) -> f32 {
     let dist_to_engine = distance(point, center);
 
     var density = 0.0;
+
     for (var i = 0u; i < nof_particles; i++) {
         var particle_pos = particles[i].xyz;
         particle_pos += snoise3(particle_pos) * dist_to_engine * 0.1;
 
         var dist = distance(point, particle_pos);
-
         if (dist > PARTICLE_RADIUS) {
           continue;
         }
-
         dist /= PARTICLE_RADIUS;
-
         let curr_density = 1.0 - dist;
 
         let particle_dist = distance(particle_pos, center);
-        let particle_intensity = 4.0 * power / particle_dist;
+        let particle_intensity = 4.0 * power / (particle_dist);
 
         density += curr_density * particle_intensity;
     }
-
     
     density = min (1.0, density);
 
@@ -104,16 +110,14 @@ fn fragment(
         return out;
     }
 
-
-
     out.color = mix(vec4f(color, 0.0), vec4f(1.0), density);
-    if (density > 0.8) {
-      out.color = mix(vec4f(color, 0.3), vec4f(1.0), 0.4);
-    } else if (density > 0.65) {
+    if (density > 0.7) {
+      out.color = mix(vec4f(color, 0.3), vec4f(1.0), 0.2);
+    } else if (density > 0.35) {
       out.color = mix(vec4f(color, 0.7), vec4f(1.0), 0.99);
-    } else  if (density > 0.4) {
+    } else  if (density > 0.2) {
       out.color = mix(vec4f(color, 0.5), vec4f(1.0), 0.6);
-    } else if (density > 0.3) {
+    } else if (density > 0.1) {
       out.color = mix(vec4f(color, 0.4), vec4f(1.0), 0.4);
     } else {
       out.color = vec4f(0.0);

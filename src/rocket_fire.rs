@@ -16,8 +16,8 @@ use bevy_fly_camera::FlyCamera;
 use bevy_tweening::{Animator, Delay, Tween, TweenCompleted};
 
 const FIRE_SHADER_PATH: &str = "shaders/rocket_fire.wgsl";
-const NOF_PARTICLES: usize = 20;
-const PARTICLE_SPEED: f32 = 50.;
+const NOF_PARTICLES: usize = 10;
+const PARTICLE_SPEED: f32 = 40.;
 
 pub struct RocketFirePlugin;
 
@@ -34,7 +34,7 @@ impl Plugin for RocketFirePlugin {
         .add_systems(Update, set_shader_params)
         .add_systems(
             Update,
-            spawn_particle.run_if(on_timer(Duration::from_millis(20))),
+            spawn_particle.run_if(on_timer(Duration::from_millis(40))),
         )
         .init_resource::<Params>();
     }
@@ -272,24 +272,18 @@ fn set_shader_params(
         return;
     };
 
-    let mut particles = particles.iter().collect::<Vec<(&Transform, &Particle)>>();
-    particles.sort_by(|(_, a), (_, b)| b.id.cmp(&a.id));
     for (i, (transform, _)) in particles.iter().enumerate() {
         fire_material.extension.particles[i] = transform.translation.extend(0.0);
     }
 
-    fire_material.extension.nof_particles = UVec4::new(particles.iter().len() as u32, 0, 0, 0);
+    fire_material.extension.nof_particles = UVec4::new(NOF_PARTICLES as u32, 0, 0, 0);
 
     fire_material.extension.dir = rocket_transform.rotation.mul_vec3(Vec3::Y).extend(0.0);
 
     fire_material.extension.center = rocket_transform.translation.extend(0.0);
 
-    // fire_material.extension.power = ;
-
-    // fire_material.extension.
-
-    let color = RED.lerp(PURPLE, params.power);
-    fire_material.extension.color = color.to_vec4();
+    // let color = RED.lerp(PURPLE, params.power);
+    fire_material.extension.color = PURPLE.to_vec4();
 
     fire_material.extension.power = Vec4::splat(params.power);
 }
