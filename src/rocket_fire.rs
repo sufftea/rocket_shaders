@@ -229,7 +229,7 @@ fn set_shader_params(
 
     let flame_dir = rocket_transform.rotation.mul_vec3(-Vec3::Y);
     let curr_time = time.elapsed().as_millis();
-    if curr_time - *last_particle_spawned > 50 {
+    if curr_time - *last_particle_spawned > 30 {
         particles_queue.push_front((rocket_transform.translation.xy(), flame_dir.xy()));
 
         if particles_queue.len() >= NOF_PARTICLES {
@@ -240,7 +240,7 @@ fn set_shader_params(
     }
 
     for (pos, flame_dir) in &mut particles_queue {
-        *pos += *flame_dir * 0.4 * params.power;
+        *pos += *flame_dir * 0.6 * params.power;
     }
 
     for (i, (pos, _)) in particles_queue.iter().enumerate() {

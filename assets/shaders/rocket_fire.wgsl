@@ -112,17 +112,22 @@ fn fragment(
     density += density_at_point(position);
 
     out.color = mix(vec4f(color, 0.0), vec4f(1.0), density);
-    if (density > 0.7) {
+
+    if (density < 0.7 && density > 0.4) {
       out.color = mix(vec4f(color, 0.7), vec4f(1.0), 0.9);
-    } else if (density > 0.55) {
-      out.color = mix(vec4f(color, 0.7), vec4f(1.0), 0.8);
-    } else  if (density > 0.3) {
-      out.color = mix(vec4f(color, 0.5), vec4f(1.0), 0.6);
-    } else if (density > 0.1) {
-      out.color = mix(vec4f(color, 0.4), vec4f(1.0), 0.4);
-    } else {
-      out.color = vec4f(0.0);
-    }
+    }  
+
+    // if (density > 0.7) {
+    //   out.color = mix(vec4f(color, 0.7), vec4f(1.0), 0.9);
+    // } else if (density > 0.55) {
+    //   out.color = mix(vec4f(color, 0.7), vec4f(1.0), 0.8);
+    // } else  if (density > 0.3) {
+    //   out.color = mix(vec4f(color, 0.5), vec4f(1.0), 0.6);
+    // } else if (density > 0.1) {
+    //   out.color = mix(vec4f(color, 0.4), vec4f(1.0), 0.4);
+    // } else {
+    //   out.color = vec4f(0.0);
+    // }
 
     return out;
     
